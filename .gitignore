@@ -1,0 +1,54 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.iml
+
+# Build artifacts
+backend/target/
+frontend/build/
+frontend/node_modules/
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+PROJECT_DEEP_DIVE.md
+test-token-validation.bat
+test-validate-debug.md
+TOKEN_VALIDATION_TESTING.md
+TOKEN_VALIDATION_FIX.md
+REGISTRATION_VALIDATION_IMPROVEMENTS.md
+DEBUG_TOKEN_VALIDATION.md
+DATABASE_CONSTRAINT_FIX.md
+POSTMAN_TOKEN_VALIDATION_TEST.md
+backend/src/main/resources/application.properties
+COMPLETE_PROJECT_ANALYSIS.md
+*.md
+POS_SaaS_Postman_Collection.json
+backend/src/main/resources/application.properties
+scripts/re-enable-workflows.sh
+scripts/re-enable-workflows.bat
+scripts/enable-workflows.sh
+scripts/enable-workflows.bat
+scripts/disable-workflows.sh
+scripts/disable-workflows.bat

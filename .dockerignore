@@ -1,0 +1,10 @@
+# .dockerignore
+node_modules
+npm-debug.log
+build
+dist
+.git
+.gitignore
+backend/target
+frontend/build
+frontend/node_modules

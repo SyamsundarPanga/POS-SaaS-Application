@@ -1,0 +1,18 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["es5", "dom"],
+    "types": ["cypress", "node"],
+    "module": "commonjs",        // <--- CRITICAL: Matches your config file style
+    "esModuleInterop": true,    // <--- CRITICAL: Allows require/import to mix
+    "isolatedModules": false,
+    "noEmit": true
+  },
+  "include": [
+    "**/*.ts",
+    "../node_modules/cypress",
+    "../src/**/*.ts",
+    "../src/**/*.tsx"
+  ]
+}
