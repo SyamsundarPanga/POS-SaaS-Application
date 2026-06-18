@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Verify Your Email</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+        <h2 style="color: #333333;">Welcome to <span th:text="${storeName}">Your Store</span>!</h2>
+        
+        <p style="color: #555555; font-size: 16px;">
+            Thank you for registering. To activate your admin account and initialize your workspace, please verify your email address by clicking the button below:
+        </p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a th:href="${verificationUrl}" style="background-color: #007BFF; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+                Verify My Email
+            </a>
+        </div>
+        
+        <p style="color: #777777; font-size: 14px;">
+            If the button doesn't work, you can copy and paste this link into your browser:<br>
+            <span th:text="${verificationUrl}" style="word-break: break-all; color: #007BFF;"></span>
+        </p>
+    </div>
+
+</body>
+</html>

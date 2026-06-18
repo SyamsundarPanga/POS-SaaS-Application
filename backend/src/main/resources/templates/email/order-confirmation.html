@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Order Confirmation</title>
+</head>
+<body style="font-family: Arial; background-color: #f4f6f8; padding: 20px;">
+    <div style="max-width:600px; margin:auto; background:white; padding:20px; border-radius:8px;">
+        <h2 style="color:#2c3e50;">Order Confirmed 🎉</h2>
+
+        <p>Hi <b th:text="${name}">User</b>,</p>
+
+        <p>Your order <b th:text="${orderNumber}">#123</b> has been successfully placed.</p>
+
+        <p><strong>Total Amount:</strong> ₹<span th:text="${amount}">0.00</span></p>
+
+        <div th:if="${cashAmount != null or cardAmount != null}">
+            <p><strong>Payment Breakdown:</strong></p>
+            <ul style="margin: 6px 0 0 18px; padding: 0;">
+                <li th:if="${cashAmount != null}">Cash: ₹<span th:text="${cashAmount}">0.00</span></li>
+                <li th:if="${cardAmount != null}">Card: ₹<span th:text="${cardAmount}">0.00</span></li>
+            </ul>
+        </div>
+
+        <p>Thank you for choosing us!</p>
+
+        <hr>
+        <p style="font-size:12px;color:gray;">
+            <span th:text="${branchName}">Branch Name</span> | <span th:text="${tenantName}">Tenant Name</span>
+        </p>
+    </div>
+</body>
+</html>

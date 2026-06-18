@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body style="font-family: Arial; background:#f4f6f8; padding:20px;">
+<div style="max-width:600px;margin:auto;background:white;padding:25px;border-radius:8px;">
+    <h2 style="color:#27ae60;">Order Confirmed ✅</h2>
+
+    <p>Hello <b th:text="${name}"></b>,</p>
+
+    <p>Your order <strong th:text="${orderNumber}"></strong> has been successfully placed.</p>
+
+    <p><strong>Total Amount:</strong> ₹<span th:text="${amount}"></span></p>
+    <p><strong>Payment Method:</strong> <span th:text="${paymentMethod}"></span></p>
+
+    <hr>
+    <p>Thank you for shopping with us!</p>
+</div>
+</body>
+</html>
