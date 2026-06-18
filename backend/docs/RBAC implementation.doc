@@ -1,0 +1,127 @@
+🔐 RBAC Implementation – POS SaaS Backend
+=========================================
+📌 Overview
+------------
+
+This project implements Role-Based Access Control (RBAC) using:
+
+Spring Security
+
+JWT Authentication
+
+Method-level security (@PreAuthorize)
+
+Multi-tenant isolation
+
+Access to APIs is controlled based on the authenticated user’s role.
+
+🛡️ Security Configuration
+-------------------------
+
+Stateless authentication (SessionCreationPolicy.STATELESS)
+
+JWT required for all protected endpoints
+
+Method-level security enabled:
+
+@EnableMethodSecurity
+
+
+Public endpoints:
+
+/api/auth/**
+/api/test/**
+/swagger-ui/**
+/v3/api-docs/**
+
+
+All other endpoints require authentication.
+
+👤 Roles Defined
+----------------
+public enum Role {
+    ROLE_SUPER_ADMIN,
+    ROLE_STORE_ADMIN,
+    ROLE_BRANCH_MANAGER,
+    ROLE_CASHIER,
+    ROLE_VIEWER
+}
+
+
+Each user has exactly one role stored as an ENUM.
+
+🔄 Role → Authority Mapping
+----------------------------
+
+User roles are converted to Spring Security authorities:
+
+new SimpleGrantedAuthority(user.getRole().name())
+
+
+Example:
+
+ROLE_STORE_ADMIN
+
+
+Used in controllers with:
+
+@PreAuthorize("hasRole('ROLE_STORE_ADMIN')")
+
+📋 Role-Permission Matrix
+------------------------
+🛒 Product APIs
+---------------
+Endpoint	Method	Access
+/api/products	POST	STORE_ADMIN
+/api/products	GET	STORE_ADMIN, CASHIER, BRANCH_MANAGER, VIEWER
+
+👥 User APIs
+------------
+Endpoint	Method	Access
+/api/users	GET	STORE_ADMIN
+/api/users	POST	STORE_ADMIN
+
+🔐 Authorization Flow
+---------------------
+Client logs in → receives JWT.
+
+JWT sent in header:
+
+Authorization: Bearer <token>
+
+
+JWT filter validates token.
+
+Spring checks required role using @PreAuthorize.
+
+Access granted or denied.
+
+🏢 Multi-Tenancy
+----------------
+Each request must include:
+
+X-Tenant-ID: <tenant-id>
+
+
+Tenant isolation is handled using TenantContext and filters.
+
+❌ Access Control Behavior
+--------------------------
+Scenario	Result
+No token	401 / 403
+Invalid token	403
+Insufficient role	403
+Valid role	200 / 201
+
+✅ Summary
+----------
+
+Stateless JWT authentication
+
+Method-level RBAC
+
+Tenant isolation
+
+Role-permission matrix documented
+
+Integration tests verify access control
