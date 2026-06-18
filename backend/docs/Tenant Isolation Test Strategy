@@ -1,0 +1,224 @@
+OBJECTIVE
+
+The purpose of this document is to describe the testing strategy used to validate tenant isolation in the Multi-Tenant SaaS POS Backend system.
+
+Tenant isolation ensures that:
+
+Data belonging to one tenant cannot be accessed by another tenant.
+
+All database queries are filtered using tenant_id.
+
+No cross-tenant data leakage occurs.
+
+SCOPE
+
+This document covers:
+
+Repository layer isolation testing
+
+Service layer isolation testing
+
+Direct SQL validation
+
+Integration testing using Testcontainers
+
+API-level tenant validation
+
+TENANT ISOLATION OVERVIEW
+
+The system enforces tenant isolation using:
+
+tenant_id column in all tenant-specific tables
+
+Tenant context management (ThreadLocal or SecurityContext)
+
+Repository-level filtering
+
+Integration tests with PostgreSQL Testcontainers
+
+Each request must contain a tenant identifier (from JWT or request header).
+
+TESTING APPROACH
+
+Testing tools used:
+
+JUnit 5
+
+Spring Boot Test
+
+Testcontainers (PostgreSQL)
+
+Maven Surefire
+
+JaCoCo for coverage validation
+
+Testing is performed at:
+
+Repository layer
+
+Service layer
+
+Integration/API layer
+
+TEST STRATEGY DETAILS
+
+5.1 Positive Tenant Isolation Test
+
+Objective:
+Verify that each tenant can access only its own data.
+
+Steps:
+
+Insert records for Tenant A.
+
+Insert records for Tenant B.
+
+Set tenant context to Tenant A.
+
+Retrieve records and verify only Tenant A data is returned.
+
+Repeat for Tenant B.
+
+Expected Result:
+
+Only tenant-specific data is returned.
+
+No cross-tenant records are accessible.
+
+5.2 Cross-Tenant Access Prevention Test
+
+Objective:
+Ensure Tenant A cannot access Tenant B’s data.
+
+Steps:
+
+Insert data for both tenants.
+
+Attempt to access Tenant B data while authenticated as Tenant A.
+
+Expected Result:
+
+Empty result OR Access denied.
+
+No data leakage.
+
+5.3 Direct SQL Isolation Test
+
+Objective:
+Ensure direct SQL queries respect tenant_id filtering.
+
+Steps:
+
+Execute raw SQL query.
+
+Verify WHERE tenant_id condition is applied.
+
+Expected Result:
+
+Query returns only current tenant records.
+
+No cross-tenant records are retrieved.
+
+5.4 Repository Layer Validation
+
+Validate that:
+
+findAll() returns only tenant-specific records.
+
+findById() respects tenant filtering.
+
+Custom queries include tenant condition.
+
+5.5 Service Layer Validation
+
+Validate that:
+
+Business logic does not bypass tenant context.
+
+All service methods respect tenant isolation rules.
+
+5.6 Integration Testing with Testcontainers
+
+Steps:
+
+Start PostgreSQL container.
+
+Apply Flyway migrations.
+
+Insert data for multiple tenants.
+
+Execute API calls.
+
+Validate tenant isolation.
+
+Expected Result:
+
+Complete data separation between tenants.
+
+TEST CASE SUMMARY
+
+Test ID: MULTI-006-QA-01
+Description: Tenant A reads own data
+Expected: Success
+
+Test ID: MULTI-006-QA-02
+Description: Tenant B reads own data
+Expected: Success
+
+Test ID: MULTI-006-QA-03
+Description: Tenant A reads Tenant B data
+Expected: Access denied or empty result
+
+Test ID: MULTI-006-QA-04
+Description: Direct SQL respects tenant_id
+Expected: Proper filtering applied
+
+Test ID: MULTI-006-QA-05
+Description: Repository findAll isolation
+Expected: Tenant-specific results only
+
+RISK ANALYSIS
+
+Potential Risks:
+
+Missing tenant filter in custom queries
+
+Native queries bypassing JPA filters
+
+Incorrect TenantContext handling
+
+Security misconfiguration
+
+Mitigation:
+
+Mandatory tenant_id in all tables
+
+Integration testing
+
+Code review
+
+Coverage validation using JaCoCo
+
+COVERAGE VALIDATION
+
+JaCoCo is used to verify that:
+
+Tenant isolation logic is executed.
+
+Repository methods are covered.
+
+Service isolation logic is tested.
+
+Target minimum coverage: 80% for service and repository layers.
+
+CONCLUSION
+
+Tenant isolation is validated through:
+
+Unit tests
+
+Integration tests
+
+Direct SQL validation
+
+API-level verification

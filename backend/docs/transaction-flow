@@ -1,0 +1,684 @@
+# INVENTORY-003-DOC-01: Inventory Transaction Flow Documentation
+
+## 📋 Overview
+
+This document provides comprehensive documentation of the transaction flow for inventory operations in the Multi-Tenant SaaS POS Platform.
+
+**Document Version:** 1.0  
+**Last Updated:** February 16, 2026  
+**Author:** POS SaaS Team  
+
+---
+
+## 🎯 Purpose
+
+Understanding the transaction flow is critical for:
+- **Developers:** Implementing new inventory features
+- **QA Engineers:** Testing inventory operations
+- **DevOps:** Troubleshooting production issues
+- **Architects:** System design and optimization
+
+---
+
+## 📊 Transaction Flow Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  INVENTORY TRANSACTION FLOW                      │
+└─────────────────────────────────────────────────────────────────┘
+
+Client Request
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. HTTP Request                                                  │
+│    POST /api/orders (contains product quantities)                │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 2. Spring Security Filter Chain                                  │
+│    ├─ JwtAuthenticationFilter                                    │
+│    │  └─ Validates JWT token                                     │
+│    └─ TenantFilterInterceptor                                    │
+│       └─ Extracts tenant_id from JWT                             │
+│       └─ Sets TenantContext.setTenantId(tenant_id)               │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 3. Controller Layer                                              │
+│    OrderController.createOrder()                                 │
+│    └─ @Transactional annotation starts transaction               │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 4. Service Layer                                                 │
+│    OrderService.createOrder()                                    │
+│    ├─ Validates order data                                       │
+│    ├─ Creates Order entity                                       │
+│    └─ Calls InventoryService.deductInventory()                   │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 5. Inventory Service                                             │
+│    InventoryService.deductInventory()                            │
+│    @Transactional(propagation = Propagation.MANDATORY)           │
+│    ├─ Gets tenant_id from TenantContext                          │
+│    ├─ Calls repository with pessimistic lock                     │
+│    └─ Validates and updates quantity                             │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 6. Repository Layer                                              │
+│    InventoryRepository.findByProductIdAndTenantIdForUpdate()     │
+│    @Lock(LockModeType.PESSIMISTIC_WRITE)                         │
+│    └─ Executes: SELECT ... FOR UPDATE                            │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 7. Database Layer                                                │
+│    PostgreSQL Transaction                                        │
+│    ├─ Acquires row-level lock on inventory record                │
+│    ├─ Reads current quantity                                     │
+│    ├─ Validates sufficient stock                                 │
+│    └─ Updates quantity (dirty checking)                          │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 8. Transaction Commit                                            │
+│    ├─ All changes persisted to database                          │
+│    ├─ Locks released                                             │
+│    └─ TenantContext.clear() in finally block                     │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 9. Response                                                      │
+│    HTTP 200 OK with order details                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔄 Detailed Transaction Flow
+
+### Phase 1: Request Initiation
+
+**Entry Point:** HTTP Request
+
+```http
+POST /api/orders HTTP/1.1
+Authorization: Bearer eyJhbGc...
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "productId": 123,
+      "quantity": 5
+    }
+  ]
+}
+```
+
+**What Happens:**
+1. Request enters Spring MVC
+2. Security filters process the request
+3. JWT token validated
+4. Tenant ID extracted from token
+
+---
+
+### Phase 2: Security & Tenant Context
+
+**Component:** `TenantFilterInterceptor`
+
+```java
+@Override
+public boolean preHandle(HttpServletRequest request, 
+                         HttpServletResponse response, 
+                         Object handler) {
+    // Extract JWT token
+    String jwt = extractJwtFromRequest(request);
+    
+    // Validate and decode token
+    Claims claims = jwtUtils.validateAndGetClaims(jwt);
+    
+    // Extract tenant ID
+    String tenantId = claims.get("tenant_id", String.class);
+    
+    // Set in ThreadLocal
+    TenantContext.setTenantId(tenantId);
+    
+    return true;
+}
+```
+
+**Key Points:**
+- Tenant ID stored in ThreadLocal
+- Available throughout request lifecycle
+- Automatically cleared after request
+
+---
+
+### Phase 3: Transaction Boundary
+
+**Component:** `OrderController` or `OrderService`
+
+```java
+@Transactional
+public OrderDto createOrder(CreateOrderRequest request) {
+    // Transaction starts here
+    
+    // Create order
+    Order order = new Order();
+    order.setTenantId(TenantContext.getTenantId());
+    
+    // Process each item
+    for (OrderItem item : request.getItems()) {
+        // Deduct inventory (within same transaction)
+        inventoryService.deductInventory(item.getProductId(), item.getQuantity());
+        
+        // Add to order
+        order.addItem(item);
+    }
+    
+    // Save order
+    orderRepository.save(order);
+    
+    // Transaction commits here (if no exception)
+    return mapToDto(order);
+}
+```
+
+**Transaction Properties:**
+- **Isolation Level:** READ_COMMITTED (default)
+- **Propagation:** REQUIRED (default)
+- **Timeout:** 30 seconds (default)
+- **Read-Only:** false
+
+---
+
+### Phase 4: Inventory Deduction
+
+**Component:** `InventoryService.deductInventory()`
+
+```java
+@Transactional(propagation = Propagation.MANDATORY)
+public void deductInventory(Long productId, Integer requestedQty) {
+    // 1. Get tenant ID from ThreadLocal
+    String tenantId = TenantContext.getTenantId();
+    
+    // 2. Acquire pessimistic lock and fetch inventory
+    Inventory inventory = inventoryRepository
+            .findByProductIdAndTenantIdForUpdate(productId, tenantId)
+            .orElseThrow(() -> new RuntimeException("Inventory not found"));
+    
+    // 3. Get current quantity
+    int availableQty = inventory.getQuantity();
+    
+    // 4. Validate sufficient stock
+    if (availableQty < requestedQty) {
+        throw new InsufficientStockException(
+                productId,
+                availableQty,
+                requestedQty
+        );
+    }
+    
+    // 5. Update quantity (dirty checking will persist)
+    inventory.setQuantity(availableQty - requestedQty);
+    
+    // 6. Lock held until transaction commits
+}
+```
+
+**Key Characteristics:**
+- **Propagation.MANDATORY:** Must run within existing transaction
+- **Pessimistic Locking:** Prevents concurrent modifications
+- **Dirty Checking:** JPA automatically detects changes
+- **Validation:** Throws exception if insufficient stock
+
+---
+
+### Phase 5: Database Lock Acquisition
+
+**SQL Executed:**
+
+```sql
+-- Step 1: Acquire lock and select
+SELECT i.id, i.product_id, i.quantity, i.tenant_id, i.created_at, i.updated_at
+FROM inventory i
+WHERE i.product_id = ? 
+  AND i.tenant_id = ?
+FOR UPDATE;
+
+-- Step 2: Update (if validation passes)
+UPDATE inventory
+SET quantity = ?,
+    updated_at = CURRENT_TIMESTAMP,
+    updated_by = ?
+WHERE id = ?;
+```
+
+**Lock Behavior:**
+- **Lock Type:** Row-level pessimistic write lock
+- **Lock Duration:** Until transaction commits or rolls back
+- **Blocking:** Other transactions wait for lock release
+- **Timeout:** Database default (usually 30-60 seconds)
+
+---
+
+### Phase 6: Transaction Commit
+
+**Commit Sequence:**
+
+```
+1. JPA Flush
+   ├─ Dirty checking detects changes
+   ├─ Generates UPDATE statements
+   └─ Executes SQL
+
+2. Database Commit
+   ├─ All changes persisted
+   ├─ Locks released
+   └─ Transaction log written
+
+3. Cleanup
+   ├─ TenantContext.clear()
+   ├─ EntityManager closed
+   └─ Connection returned to pool
+```
+
+---
+
+## 🔒 Locking Mechanism
+
+### Pessimistic Locking Explained
+
+**Why Pessimistic Locking?**
+
+Inventory operations require pessimistic locking because:
+1. **High Contention:** Multiple cashiers may update same product
+2. **Data Integrity:** Must prevent overselling
+3. **Consistency:** Quantity must be accurate
+4. **Simplicity:** Easier than optimistic locking for this use case
+
+**How It Works:**
+
+```
+Thread 1                          Thread 2
+   │                                 │
+   ├─ SELECT ... FOR UPDATE          │
+   │  (Acquires lock) 🔒             │
+   │                                 │
+   ├─ Read quantity: 100             │
+   │                                 ├─ SELECT ... FOR UPDATE
+   ├─ Validate: 100 >= 30 ✅         │  (Waits for lock...) ⏳
+   │                                 │
+   ├─ Update: 100 - 30 = 70          │
+   │                                 │
+   ├─ COMMIT                         │
+   │  (Releases lock) 🔓             │
+   │                                 │
+   │                                 ├─ (Lock acquired) 🔒
+   │                                 │
+   │                                 ├─ Read quantity: 70
+   │                                 │
+   │                                 ├─ Validate: 70 >= 40 ✅
+   │                                 │
+   │                                 ├─ Update: 70 - 40 = 30
+   │                                 │
+   │                                 └─ COMMIT
+   │                                    (Releases lock) 🔓
+   │
+   ▼                                 ▼
+Final quantity: 30 ✅ (Correct!)
+```
+
+**Without Locking (Race Condition):**
+
+```
+Thread 1                          Thread 2
+   │                                 │
+   ├─ SELECT (no lock)               │
+   │  Read quantity: 100             ├─ SELECT (no lock)
+   │                                 │  Read quantity: 100
+   ├─ Validate: 100 >= 30 ✅         │
+   │                                 ├─ Validate: 100 >= 40 ✅
+   ├─ Update: 100 - 30 = 70          │
+   │                                 ├─ Update: 100 - 40 = 60
+   ├─ COMMIT                         │
+   │                                 └─ COMMIT
+   │                                 
+   ▼                                 ▼
+Final quantity: 60 ❌ (Lost update! Should be 30)
+```
+
+---
+
+## 🎯 Transaction Propagation
+
+### Propagation.MANDATORY Explained
+
+```java
+@Transactional(propagation = Propagation.MANDATORY)
+public void deductInventory(Long productId, Integer quantity) {
+    // This method MUST be called within an existing transaction
+}
+```
+
+**Why MANDATORY?**
+
+1. **Atomicity:** Inventory deduction must be part of order creation
+2. **Consistency:** If order fails, inventory should rollback
+3. **Safety:** Prevents accidental standalone calls
+4. **Design:** Forces proper transaction management
+
+**Example:**
+
+```java
+// ✅ CORRECT: Called within transaction
+@Transactional
+public void createOrder() {
+    // Transaction started
+    inventoryService.deductInventory(productId, qty); // Works!
+    orderRepository.save(order);
+    // Transaction commits
+}
+
+// ❌ WRONG: Called without transaction
+public void someMethod() {
+    inventoryService.deductInventory(productId, qty); // Throws exception!
+}
+```
+
+---
+
+## 🔄 Transaction Rollback Scenarios
+
+### Scenario 1: Insufficient Stock
+
+```java
+@Transactional
+public void createOrder() {
+    // Start transaction
+    
+    Order order = new Order();
+    orderRepository.save(order); // Saved to DB
+    
+    // Try to deduct inventory
+    inventoryService.deductInventory(productId, 1000); 
+    // Throws InsufficientStockException
+    
+    // Transaction rolls back
+    // Order is NOT saved (rollback)
+}
+```
+
+**Result:** No changes persisted, database remains consistent
+
+---
+
+### Scenario 2: Database Constraint Violation
+
+```java
+@Transactional
+public void createOrder() {
+    // Deduct inventory
+    inventoryService.deductInventory(productId, 10); // Success
+    
+    // Try to save order with duplicate ID
+    Order order = new Order();
+    order.setId(existingId); // Duplicate!
+    orderRepository.save(order); // Throws exception
+    
+    // Transaction rolls back
+    // Inventory deduction is undone
+}
+```
+
+**Result:** Inventory quantity restored to original value
+
+---
+
+### Scenario 3: Runtime Exception
+
+```java
+@Transactional
+public void createOrder() {
+    // Deduct inventory
+    inventoryService.deductInventory(productId, 10); // Success
+    
+    // Business logic error
+    if (customer.getBalance() < order.getTotal()) {
+        throw new InsufficientFundsException(); // RuntimeException
+    }
+    
+    // Transaction rolls back
+    // Inventory deduction is undone
+}
+```
+
+**Result:** All changes rolled back, including inventory
+
+---
+
+## 📈 Performance Characteristics
+
+### Typical Execution Times
+
+| Operation | Average Time | P95 | P99 |
+|-----------|--------------|-----|-----|
+| Inventory Deduction | 20-50ms | 80ms | 100ms |
+| Stock Addition | 20-50ms | 80ms | 100ms |
+| Stock Query | 5-15ms | 30ms | 50ms |
+| Full Order Creation | 100-200ms | 300ms | 500ms |
+
+### Performance Factors
+
+**Fast Operations:**
+- ✅ Indexed queries (product_id, tenant_id)
+- ✅ Row-level locking (not table-level)
+- ✅ Connection pooling
+- ✅ JPA dirty checking (no explicit save needed)
+
+**Potential Bottlenecks:**
+- ⚠️ Lock contention (multiple threads)
+- ⚠️ Network latency (database connection)
+- ⚠️ Transaction timeout (long-running operations)
+- ⚠️ Database load (concurrent users)
+
+---
+
+## 🛡️ Error Handling
+
+### Exception Hierarchy
+
+```
+RuntimeException
+    │
+    ├─ InsufficientStockException
+    │  └─ Thrown when quantity < requested
+    │
+    ├─ ResourceNotFoundException
+    │  └─ Thrown when inventory not found
+    │
+    └─ TenantNotFoundException
+       └─ Thrown when tenant_id invalid
+```
+
+### Exception Handling Flow
+
+```java
+try {
+    // Transaction starts
+    inventoryService.deductInventory(productId, quantity);
+    // Transaction commits
+    
+} catch (InsufficientStockException e) {
+    // Transaction rolls back automatically
+    // Return 400 Bad Request
+    return ResponseEntity.badRequest()
+            .body(new ErrorResponse("Insufficient stock"));
+            
+} catch (ResourceNotFoundException e) {
+    // Transaction rolls back automatically
+    // Return 404 Not Found
+    return ResponseEntity.notFound().build();
+}
+```
+
+---
+
+## 🔍 Monitoring & Debugging
+
+### Key Metrics to Monitor
+
+1. **Transaction Duration**
+   ```sql
+   SELECT avg(duration_ms) 
+   FROM transaction_log 
+   WHERE operation = 'inventory_deduction';
+   ```
+
+2. **Lock Wait Time**
+   ```sql
+   SELECT * FROM pg_stat_activity 
+   WHERE wait_event_type = 'Lock';
+   ```
+
+3. **Rollback Rate**
+   ```sql
+   SELECT 
+       COUNT(*) FILTER (WHERE status = 'rollback') * 100.0 / COUNT(*) 
+   FROM transaction_log;
+   ```
+
+### Debug Logging
+
+Enable transaction logging:
+
+```properties
+# application.properties
+logging.level.org.springframework.transaction=DEBUG
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+```
+
+**Sample Output:**
+```
+DEBUG o.s.t.support.TransactionTemplate : Creating new transaction
+DEBUG o.h.SQL : select inventory0_.id ... from inventory inventory0_ where ... for update
+TRACE o.h.t.d.s.BasicBinder : binding parameter [1] as [BIGINT] - [123]
+DEBUG o.h.SQL : update inventory set quantity=?, updated_at=? where id=?
+DEBUG o.s.t.support.TransactionTemplate : Committing transaction
+```
+
+---
+
+## 📚 Best Practices
+
+### DO ✅
+
+1. **Always use transactions for inventory operations**
+   ```java
+   @Transactional
+   public void updateInventory() { ... }
+   ```
+
+2. **Use pessimistic locking for high-contention operations**
+   ```java
+   @Lock(LockModeType.PESSIMISTIC_WRITE)
+   Optional<Inventory> findByProductIdForUpdate(...);
+   ```
+
+3. **Validate before updating**
+   ```java
+   if (availableQty < requestedQty) {
+       throw new InsufficientStockException(...);
+   }
+   ```
+
+4. **Keep transactions short**
+   ```java
+   // Do heavy computation OUTSIDE transaction
+   // Only database operations INSIDE transaction
+   ```
+
+5. **Always clear TenantContext**
+   ```java
+   try {
+       TenantContext.setTenantId(tenantId);
+       // Operations
+   } finally {
+       TenantContext.clear();
+   }
+   ```
+
+### DON'T ❌
+
+1. **Don't call inventory methods without transaction**
+   ```java
+   // ❌ WRONG
+   public void someMethod() {
+       inventoryService.deductInventory(...); // Exception!
+   }
+   ```
+
+2. **Don't use optimistic locking for inventory**
+   ```java
+   // ❌ WRONG for inventory
+   @Version
+   private Long version;
+   ```
+
+3. **Don't perform long operations in transaction**
+   ```java
+   // ❌ WRONG
+   @Transactional
+   public void processOrder() {
+       sendEmail(); // Slow!
+       callExternalAPI(); // Slow!
+       updateInventory(); // Fast
+   }
+   ```
+
+4. **Don't ignore exceptions**
+   ```java
+   // ❌ WRONG
+   try {
+       inventoryService.deductInventory(...);
+   } catch (Exception e) {
+       // Silently ignore - BAD!
+   }
+   ```
+
+---
+
+## 🎓 Summary
+
+### Key Takeaways
+
+1. **Transaction Scope:** Inventory operations run within order transaction
+2. **Locking:** Pessimistic write locks prevent race conditions
+3. **Propagation:** MANDATORY ensures proper transaction management
+4. **Rollback:** Any exception rolls back entire transaction
+5. **Performance:** Operations complete in < 100ms
+6. **Tenant Isolation:** TenantContext ensures data separation
+
+### Transaction Flow in One Sentence
+
+> "When an order is created, a transaction starts, inventory is locked and deducted within that transaction, and if any error occurs, everything rolls back to maintain consistency."
+
+---
+
+**Document Status:** ✅ Complete  
+**Review Date:** February 16, 2026  
+**Next Review:** March 16, 2026
