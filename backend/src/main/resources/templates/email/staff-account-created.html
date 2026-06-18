@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Staff Account Created</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 20px;">
+    <div style="max-width:600px; margin:auto; background:white; padding:20px; border-radius:8px;">
+        <h2 style="color:#2c3e50;">Your Staff Account Is Ready</h2>
+
+        <p>Hi <b th:text="${name}">User</b>,</p>
+
+        <p>Your PayPoint staff account has been created successfully.</p>
+
+        <p>
+            <strong>Role:</strong> <span th:text="${role}">Cashier</span><br/>
+            <span th:if="${branchName != null}">
+                <strong>Branch:</strong> <span th:text="${branchName}">Main Branch</span><br/>
+            </span>
+            <strong>Login Email:</strong> <span th:text="${email}">you@example.com</span>
+        </p>
+
+        <p style="font-size: 14px; color: #555;">
+            Use the email above and the password provided by your admin/manager to sign in.
+        </p>
+
+        <hr>
+        <p style="font-size:12px;color:gray;">
+            <span th:text="${branchName}">Branch Name</span> | <span th:text="${tenantName}">Tenant Name</span>
+        </p>
+    </div>
+</body>
+</html>

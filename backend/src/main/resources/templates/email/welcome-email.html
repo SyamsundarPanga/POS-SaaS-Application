@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome to Your Workspace</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; border-top: 5px solid #28a745; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+        <h2 style="color: #333333;">Your Workspace is Ready!</h2>
+        
+        <p style="color: #555555; font-size: 16px;">
+            Hello from <strong th:text="${storeName}">Your Store</strong>! Your email has been verified and your new tenant workspace is successfully initialized. 
+        </p>
+
+        <p style="color: #555555; font-size: 16px;">
+            Your subscription is active and your admin account is ready to use.
+        </p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a th:href="${loginUrl}" style="background-color: #28a745; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+                Log In to Dashboard
+            </a>
+        </div>
+    </div>
+
+</body>
+</html>

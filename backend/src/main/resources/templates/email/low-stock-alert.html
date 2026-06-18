@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body style="font-family: Arial; background:#eef2ff; padding:20px;">
+<div style="max-width:600px;margin:auto;background:white;padding:25px;border-radius:8px;">
+    <h2 style="color:#3b82f6;">Low Stock Alert 📦</h2>
+
+    <p>Hello <b th:text="${name}"></b>,</p>
+
+    <p>The following product is running low:</p>
+
+    <p><strong>Branch:</strong> <span th:text="${branchName}"></span></p>
+    <p><strong>Product:</strong> <span th:text="${productName}"></span></p>
+    <p><strong>Remaining Quantity:</strong> <span th:text="${currentStock}"></span></p>
+    <p><strong>Threshold:</strong> <span th:text="${threshold}"></span></p>
+
+    <a th:href="${manageUrl}"
+       style="display:inline-block;margin-top:15px;padding:10px 20px;background:#3b82f6;color:white;text-decoration:none;border-radius:4px;">
+        Manage Inventory
+    </a>
+</div>
+</body>
+</html>

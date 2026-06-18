@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body style="margin:0;padding:24px;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;">
+<div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+    <div style="background:#0f172a;padding:24px 28px;">
+        <h1 style="margin:0;color:#ffffff;font-size:24px;">PayPoint</h1>
+        <p style="margin:8px 0 0;color:#cbd5e1;font-size:14px;">Tenant Account Deactivated</p>
+    </div>
+
+    <div style="padding:28px;">
+        <p style="margin:0 0 16px;font-size:15px;">Hello <strong th:text="${name}">Store Admin</strong>,</p>
+
+        <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">
+            Your account for <strong th:text="${tenantName}">PayPoint Store</strong> has been deactivated by superadmin.
+        </p>
+
+        <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">
+            For more information, please contact superadmin at
+            <a th:href="'mailto:' + ${superAdminEmail}"
+               th:text="${superAdminEmail}"
+               style="color:#0f766e;text-decoration:none;font-weight:600;">superadmin@possaas.com</a>.
+        </p>
+    </div>
+</div>
+</body>
+</html>
